@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="GBK"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+	http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+	http://www.springframework.org/schema/tx 
+	http://www.springframework.org/schema/tx/spring-tx-3.0.xsd
+	http://www.springframework.org/schema/context
+	http://www.springframework.org/schema/context/spring-context-2.5.xsd
+	http://www.springframework.org/schema/aop 
+	http://www.springframework.org/schema/aop/spring-aop-3.0.xsd">
+
+	<context:annotation-config />
+	<context:component-scan base-package="oops.saturn" />
+	
+	<bean class="org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor" />
+	<bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>classpath:jdbc.properties</value>
+			</list>
+		</property>
+	</bean>
+	
+	<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource"
+		destroy-method="close"
+		p:driverClass="${jdbc.driverClass}"
+		p:jdbcUrl="${jdbc.jdbcUrl}"
+		p:user="${jdbc.user}"
+		p:password="${jdbc.password}"
+		p:maxPoolSize="${jdbc.maxPoolSize}"
+		p:minPoolSize="${jdbc.minPoolSize}"
+		p:initialPoolSize="${jdbc.initialPoolSize}"
+		p:maxIdleTime="${jdbc.maxIdleTime}"/>
+	
+	<bean id="sessionFactory" class="org.springframework.orm.hibernate3.annotation.AnnotationSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="namingStrategy">
+			<bean class="oops.saturn.other.SaturnNamingStrategy" />
+		</property>
+		<property name="hibernateProperties">
+			<value>
+				hibernate.dialect=${hibernate.dialect}
+				hibernate.query.substitutions=true 'Y', false 'N'
+				hibernate.cache.use_second_level_cache=false
+				hibernate.cache.provider_class=org.hibernate.cache.EhCacheProvider
+				hibernate.show_sql=true
+				hibernate.hbm2ddl.auto=update
+            </value>
+		</property>
+		<property name="configLocations">
+			<value>classpath:hibernate-framework.cfg.xml</value>
+		 </property>
+	</bean>
+	
+	<!-- 配置Hibernate的局部事务管理器，使用HibernateTransactionManager类 -->
+	<!-- 该类实现PlatformTransactionManager接口，是针对Hibernate的特定实现-->
+	<!-- 并注入SessionFactory的引用 -->
+	<bean id="transactionManager" class=
+		"org.springframework.orm.hibernate3.HibernateTransactionManager"
+		p:sessionFactory-ref="sessionFactory"/>
+
+	<!-- 配置事务增强处理Bean,指定事务管理器 -->
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<!-- 用于配置详细的事务语义 -->
+		<tx:attributes>			
+			<!-- 其他方法使用默认的事务设置 -->
+			<tx:method name="*" rollback-for="Exception"/>
+		</tx:attributes>
+	</tx:advice>
+	<aop:config>
+		<aop:pointcut id="commonPointcut" expression="execution(* oops.saturn.manager..*.*(..))"/>
+		<!-- 指定在rbPointcut切入点应用txAdvice事务增强处理 -->
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="commonPointcut"/>
+	</aop:config>
+	
+</beans>
